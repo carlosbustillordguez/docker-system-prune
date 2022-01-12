@@ -37,8 +37,8 @@ docker-system-prune.sh -d /dev/sda1
 
 ```sh
 cat <<EOF > /etc/cron.d/docker-system-prune
-# Prune the system daily if the used percent is greater or equeal than 75%
-0 0 * * * root /usr/local/bin/docker-system-prune.sh -d /dev/sda1
+# Prune the system daily if the used percent is greater or equal than 75%
+0 0 * * * root /usr/local/bin/docker-system-prune.sh -d /dev/sda1 >/dev/null 2>&1
 EOF
 ```
 
