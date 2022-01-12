@@ -1,0 +1,24 @@
+# top-most EditorConfig file
+root = true
+
+[*]
+charset                  = utf-8
+end_of_line              = lf
+insert_final_newline     = true
+trim_trailing_whitespace = true
+
+# Google's shell style defined in <https://google.github.io/styleguide/shell.xml>
+[*.sh]
+indent_style         = space
+indent_size          = 2     # like -i 2
+# binary ops like && and | may start a line
+binary_next_line     = true  # like -bn
+# switch cases will be indented
+switch_case_indent   = true  # like -ci
+# redirect operators will be followed by a space
+space_redirects      = true  # like -sr
+# keep column alignment paddings
+keep_padding         = true  # like -kp
+
+[*.md]
+indent_size = 4
