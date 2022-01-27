@@ -5,16 +5,20 @@ set -eo pipefail
 #
 #  - all stopped containers
 #  - all networks not used by at least one container
+#  - all volumes not used by at least one container (by setting the `-v | --volumes` script argument)
 #  - all images without at least one container associated to them
 #  - all build cache
 #
 # The default value for USED_PERCENT_THRESHOLD is 75
 #
 # Usage:
-#   ./docker-system-prune.sh -d DEVICE_NAME [ -t USED_PERCENT_THRESHOLD ]
+#   ./docker-system-prune.sh -d DEVICE_NAME [ -t USED_PERCENT_THRESHOLD ] [ -v ]
 #
 # Example:
 #   ./docker-system-prune.sh -d /dev/sda1
+#
+# To remove all volumes not used by at least one container:
+#   ./docker-system-prune.sh -d /dev/sda1 -v
 #
 # By Carlos Miguel Bustillo Rdguez <https://linkedin.com/in/carlosbustillordguez/>
 #
@@ -28,8 +32,7 @@ main() {
   check_requirements
   parse_cmdline "$@"
   check_arguments "$DEVICE_NAME" "$USED_PERCENT_THRESHOLD"
-  check_if_already_lauched
-  docker_system_prune "$DEVICE_NAME" "$USED_PERCENT_THRESHOLD"
+  docker_system_prune "$DEVICE_NAME" "$USED_PERCENT_THRESHOLD" "$PRUNE_VOLUMES"
 } # => main()
 
 #######################################################################
@@ -100,21 +103,24 @@ check_arguments() {
 # Arguments:
 #   device_name - a valid block device name, e.g: /dev/sda1
 #   used_percent_threshold - the used percent threshold for device_name
+#   prune_volumes - whether to prune or not all not used volumes
 #######################################################################
 docker_system_prune() {
   local device_name="$1"
   local used_percent_threshold="${2:-"75"}"
+  local prune_volumes="$3"
+  local exit_code=0
 
   # Get the current used space in percent
   used_percent=$(df -l | grep "$device_name" | awk '{print $5}' | sed 's/%//g') || true
 
   # Prune the system if the $USED_PERCENT is greater or equal than $used_percent_threshold
   if [[ $used_percent -ge $used_percent_threshold ]] && [[ "$used_percent" != "" ]]; then
-    docker system prune --all --force
-    local exit_code=$?
+    docker system prune --all --force --volumes="$prune_volumes"
+    exit_code=$?
   elif [[ "$used_percent" == "" ]]; then
     echo "The '$device_name' block device is not mounted in the system!"
-    local exit_code=1
+    exit_code=1
   fi
 
   # Remove the lock for this script
@@ -132,11 +138,12 @@ docker_system_prune() {
 #######################################################################
 parse_cmdline() {
   # Global variables
-  declare -g DEVICE_NAME USED_PERCENT_THRESHOLD
+  declare -g DEVICE_NAME USED_PERCENT_THRESHOLD PRUNE_VOLUMES
+  PRUNE_VOLUMES="false"
 
   # Parser config
   declare argv
-  argv=$(getopt -o 'd:t:' --long 'device:,threshold:' -n "$(basename "$0")" -- "$@") || return
+  argv=$(getopt -o 'd:t:v' --long 'device:,threshold:,volumes' -n "$(basename "$0")" -- "$@") || return
   eval "set -- $argv"
 
   for argv; do
@@ -149,6 +156,12 @@ parse_cmdline() {
       -t | --threshold)
         shift
         USED_PERCENT_THRESHOLD="$1"
+        ;;
+      -v | --volumes)
+        shift
+        PRUNE_VOLUMES="true"
+        ;;
+      --)
         break
         ;;
     esac
