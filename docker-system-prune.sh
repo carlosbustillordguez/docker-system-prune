@@ -18,15 +18,35 @@ set -eo pipefail
 #
 # By Carlos Miguel Bustillo Rdguez <https://linkedin.com/in/carlosbustillordguez/>
 #
-# Version: 1.0.0
+# Version: 1.1.0
 
-# Main function
+# Global variables.
+readonly SCRIPT_LOCK_FILE="/tmp/docker-system-prune-launched.lock"
+
+# Main Function.
 main() {
   check_requirements
   parse_cmdline "$@"
   check_arguments "$DEVICE_NAME" "$USED_PERCENT_THRESHOLD"
+  check_if_already_lauched
   docker_system_prune "$DEVICE_NAME" "$USED_PERCENT_THRESHOLD"
 } # => main()
+
+#######################################################################
+# Check if this script has a previous execution running.
+# Globals:
+#   SCRIPT_LOCK_FILE
+# Arguments:
+#   None
+#######################################################################
+check_if_already_lauched() {
+  if [ -e "$SCRIPT_LOCK_FILE" ]; then
+    echo "$(basename "$0"): There is a previous instance launched. Exiting..."
+    exit 1
+  else
+    touch "$SCRIPT_LOCK_FILE"
+  fi
+} # => check_if_already_lauched()
 
 #######################################################################
 # Check the script requirements.
@@ -76,7 +96,7 @@ check_arguments() {
 #######################################################################
 # Docker prune system.
 # Globals:
-#   None
+#   SCRIPT_LOCK_FILE
 # Arguments:
 #   device_name - a valid block device name, e.g: /dev/sda1
 #   used_percent_threshold - the used percent threshold for device_name
@@ -91,10 +111,15 @@ docker_system_prune() {
   # Prune the system if the $USED_PERCENT is greater or equal than $used_percent_threshold
   if [[ $used_percent -ge $used_percent_threshold ]] && [[ "$used_percent" != "" ]]; then
     docker system prune --all --force
+    local exit_code=$?
   elif [[ "$used_percent" == "" ]]; then
     echo "The '$device_name' block device is not mounted in the system!"
-    exit 1
+    local exit_code=1
   fi
+
+  # Remove the lock for this script
+  [[ -e "$SCRIPT_LOCK_FILE" ]] && rm -f "$SCRIPT_LOCK_FILE"
+  exit $exit_code
 } # => docker_system_prune()
 
 #######################################################################
